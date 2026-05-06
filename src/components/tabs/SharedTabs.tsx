@@ -42,6 +42,8 @@ export function WeekTimeline({
   const monthLabel = `${start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
   const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+  const todayIso = toIso(new Date());
+
   return (
     <div className="weektl">
       <div className="weektl-head">
@@ -70,9 +72,10 @@ export function WeekTimeline({
         {days.map((d) => {
           const iso = toIso(d);
           const isActive = iso === activeIso;
+          const isToday = iso === todayIso;
           const dayNum = d.getDate();
           return (
-            <button key={iso} className={`weektl-chip ${isActive ? 'active' : ''}`} onClick={() => onPick(iso)}>
+            <button key={iso} className={`weektl-chip ${isActive ? 'active' : ''} ${isToday ? 'today' : ''}`} onClick={() => onPick(iso)}>
               <div className="weektl-chip-dow">{DOW[d.getDay()]}</div>
               <div className="weektl-chip-num">{dayNum}</div>
               <div className="weektl-chip-underline" />
@@ -130,7 +133,12 @@ export function TaskPopup({
           <Button onClick={async () => {
             try {
               if (mode === 'create') {
-                await taskApi.createTask(title.trim(), desc.trim());
+                const userId = localStorage.getItem('user_id');
+                if (!userId) {
+                  console.error('No user_id found in localStorage');
+                  return;
+                }
+                await taskApi.createTask(userId, { title: title.trim(), description: desc.trim() });
               } else {
                 // If it's an edit, you'd call a PUT task endpoint if available.
                 // await taskApi.updateTask(task.id, { title: title.trim(), description: desc.trim() });

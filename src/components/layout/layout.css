@@ -17,7 +17,10 @@
   border-right: 1px solid var(--hairline);
   padding: 22px 14px 16px;
   display: flex; flex-direction: column;
-  position: relative;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 10;
 }
 .sidebar-brand {
   display: flex; align-items: center; gap: 10px;

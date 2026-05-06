@@ -58,8 +58,8 @@ export function Sidebar({ tab, onTab, darkMode = false, onToggleDark }: SidebarP
             <div className="toggle-pill-thumb" />
           </div>
         </button>
-        <button className="signout">
-          <IconSignOut /> Sign Out
+        <button className="signout" onClick={() => navigate('/settings')}>
+          <IconEdit /> Settings
         </button>
       </div>
     </aside>

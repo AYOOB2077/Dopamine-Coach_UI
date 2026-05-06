@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { WeekTimeline, TaskPopup } from './SharedTabs';
 import { IconChev, IconPlus } from '../shared/Icons';
 import { Task } from '../../types/models';
+import { taskApi } from '../../lib/api';
 
 function UpcomingCard({ task, onEdit, onLaunch }: { task: Partial<Task>; onEdit: (task: Partial<Task>) => void; onLaunch: (task: Partial<Task>) => void; }) {
   const [open, setOpen] = useState(false);
@@ -44,15 +45,36 @@ function UpcomingCard({ task, onEdit, onLaunch }: { task: Partial<Task>; onEdit:
 
 export function UpcomingTab({ onLaunchTask }: { onLaunchTask: (task: Partial<Task>) => void }) {
   const [tasks, setTasks] = useState<Partial<Task>[]>([]);
-  const [activeIso, setActiveIso] = useState('2024-12-27');
+  const todayIso = new Date().toISOString().split('T')[0];
+  const [activeIso, setActiveIso] = useState(todayIso);
   const [weekOffset, setWeekOffset] = useState(0);
   const [popup, setPopup] = useState<{ mode: 'create' | 'edit'; initial?: Partial<Task> } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/upcoming.json')
-      .then(res => res.json())
-      .then(data => setTasks(data.tasks))
-      .catch(err => console.error('Failed to load upcoming tasks:', err));
+    const loadTasks = async () => {
+      try {
+        setLoading(true);
+        const response = await taskApi.getUpcomingTasks();
+        // Map API response to frontend task format
+        const mappedTasks = response.data.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          isoDate: '2024-12-27', // TODO: Extract from task data if available
+          timeLabel: new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          dateLabel: new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        }));
+        setTasks(mappedTasks);
+      } catch (err) {
+        console.error('Failed to load upcoming tasks:', err);
+        setError('Failed to load tasks');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTasks();
   }, []);
 
   const visible = tasks.filter(t => t.isoDate === activeIso);

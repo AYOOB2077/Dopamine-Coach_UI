@@ -154,6 +154,17 @@
 .weektl-chip.active .weektl-chip-num { color: var(--green); }
 .weektl-chip.active .weektl-chip-underline { background: var(--mint-stripe); }
 
+.weektl-chip.today {
+  background: #e0f2fe;
+  border-color: #bae6fd;
+}
+.weektl-chip.today .weektl-chip-dow {
+  color: #0284c7;
+}
+.weektl-chip.today .weektl-chip-num {
+  color: #0369a1;
+}
+
 /* Task detail (expanded row) */
 .task-detail {
   padding: 16px 24px 20px 28px;

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { Shell } from './components/layout/Shell';
 import {
   CoachScreen,
+  GeneratingScreen,
   RoadmapScreen,
   FocusScreen,
   RestScreen,
@@ -16,7 +17,10 @@ import { FinishedTab } from './components/tabs/FinishedTab';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { SignupScreen } from './components/auth/SignupScreen';
 import { SetupScreen } from './components/auth/SetupScreen';
+import { SettingsScreen } from './components/user/SettingsScreen';
 import { Task, Step, BackendRoadmapResponse } from './types/models';
+
+import { taskApi, stepApi } from './lib/api';
 
 export default function App() {
   const navigate = useNavigate();
@@ -44,77 +48,61 @@ export default function App() {
 
   const handleGo = async ({ title, body }: { title: string; body: string }) => {
     try {
-      // Try to fetch real API first, fallback to mock data in development
-      let backendData: BackendRoadmapResponse;
-
-      const useMockMode = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_DATA !== 'false';
-
-      if (useMockMode) {
-        // Load mock data from public folder
-        const mockResponse = await fetch('/mock-roadmap.json');
-        if (!mockResponse.ok) throw new Error('Mock data not found');
-        backendData = await mockResponse.json();
-      } else {
-        // Call backend API to generate roadmap
-        const response = await fetch('/api/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, description: body })
-        });
-
-        if (!response.ok) {
-          // Fallback to mock data if API fails in development
-          if (import.meta.env.DEV) {
-            console.warn('API failed, using mock data');
-            const mockResponse = await fetch('/mock-roadmap.json');
-            if (!mockResponse.ok) throw new Error('API failed and mock data unavailable');
-            backendData = await mockResponse.json();
-          } else {
-            throw new Error('Failed to generate roadmap');
-          }
-        } else {
-          backendData = await response.json();
-        }
+      const userId = localStorage.getItem('user_id');
+      if (!userId) {
+        console.error('User not logged in or missing user_id');
+        return;
       }
 
-      // Convert snake_case from backend to camelCase for frontend
-      const steps: Partial<Step>[] = backendData.tasks.map((task, index) => ({
-        id: task.task_id,
-        title: task.step_title,
-        stepTitle: task.step_title,
-        decomposition: task.decomposition,
-        estimatedTime: task.estimated_time,
-        primaryVerb: task.primary_verb,
-        deliverable: task.deliverable,
-        noveltyHook: task.novelty_hook,
-        passionAnchor: task.passion_anchor,
-        urgencyCue: task.urgency_cue,
-        incupTags: task.incup_tags,
-        isCompleted: false,
-        orderIndex: index
+      // Show waiting screen while generating
+      navigate('/coach/generating');
+
+      // Create the AI task which includes steps generation
+      const taskRes = await taskApi.createTaskWithStepsFromAi(userId, { 
+        title, 
+        description: body,
+        userInput: body
+      });
+      const createdTask = taskRes.data;
+
+      // Now fetch the steps for this task
+      const stepsRes = await stepApi.getStepsByTaskId(createdTask.id);
+      const backendSteps = stepsRes.data;
+
+      // Convert backend steps (StepResponseDto) to frontend Step
+      const steps: Partial<Step>[] = backendSteps.map((step: any) => ({
+        id: step.id,
+        title: step.stepTitle,
+        stepTitle: step.stepTitle,
+        decomposition: step.stepDescription,
+        estimatedTime: step.estimatedTime,
+        primaryVerb: step.primaryVerb,
+        deliverable: step.deliverable,
+        noveltyHook: step.noveltyHook,
+        passionAnchor: step.passionAnchor,
+        urgencyCue: step.urgencyCue,
+        incupTags: step.incupTag ? [step.incupTag.toString()] : [],
+        isCompleted: step.status === 2,
+        orderIndex: step.stepOrder
       }));
 
-      // Build sessionMetadata from snake_case
-      const sessionMetadata = {
-        intentPriority: backendData.session_metadata.intent_priority,
-        estimatedTotalSessionTime: backendData.session_metadata.estimated_total_session_time,
-        totalTasks: backendData.session_metadata.total_tasks
-      };
-
-      // Set task with steps and metadata
+      // Set task with steps
       setTask({
-        title,
-        description: body,
+        id: createdTask.id,
+        title: createdTask.title,
+        description: createdTask.description,
         steps: steps as Step[],
-        sessionMetadata
       });
+      
       setSteps(steps);
       setStepIdx(0);
+      
       // Navigate to roadmap view
       navigate('/coach/roadmap');
     } catch (error) {
       console.error('Error generating roadmap:', error);
-      // Fallback to empty state or show error UI
+      // Fallback to home coach view on error
+      navigate('/coach');
     }
   };
 
@@ -220,6 +208,7 @@ export default function App() {
         
         {/* Coach Screen Routes */}
         <Route path="/coach" element={<CoachScreen onGo={handleGo} />} />
+        <Route path="/coach/generating" element={<GeneratingScreen />} />
         <Route path="/coach/roadmap" element={
           task ? <RoadmapScreen task={task} onStart={handleStart} /> : <Navigate to="/coach" replace />
         } />
@@ -273,6 +262,9 @@ export default function App() {
         } />
 
         <Route path="/finished" element={<FinishedTab />} />
+
+        {/* Global Routes */}
+        <Route path="/settings" element={<SettingsScreen />} />
         
         <Route path="*" element={<Navigate to="/coach" replace />} />
       </Routes>

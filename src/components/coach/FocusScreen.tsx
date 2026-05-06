@@ -2,7 +2,7 @@ import './FocusScreen.css';
 import React, { useRef, useState } from 'react';
 import { Hourglass, HourglassHandle } from '../shared/Icons';
 import { Step } from '../../types/models';
-import { focusSessionApi, taskApi } from '../../lib/api';
+import { focusSessionApi, stepApi } from '../../lib/api';
 
 export function FocusScreen({
   stepTitle,
@@ -132,8 +132,8 @@ export function FocusScreen({
         </button>
         <button className="focus-sq focus-sq-complete" onClick={async () => {
           try {
-            if (step && step.taskId && step.id) {
-              await taskApi.completeStep(step.taskId, step.id);
+            if (step && step.id) {
+              await stepApi.completeStep(step.id);
             }
           } catch (e) {
             console.error('Failed to mark step complete', e);

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { WeekTimeline } from './SharedTabs';
 import { IconChev, IconCheck } from '../shared/Icons';
 import { Task, Step } from '../../types/models';
+import { taskApi } from '../../lib/api';
 
 function OngoingCard({ task, onStart }: { task: Partial<Task>; onStart: (task: Partial<Task>, stepIdx: number) => void }) {
   const [open, setOpen] = useState(task.defaultOpen || false);
@@ -78,14 +79,36 @@ function OngoingCard({ task, onStart }: { task: Partial<Task>; onStart: (task: P
 
 export function OngoingTab({ onStartWork }: { onStartWork: (task: Partial<Task>, startIdx: number) => void }) {
   const [seed, setSeed] = useState<Partial<Task>[]>([]);
-  const [activeIso, setActiveIso] = useState('2024-12-26');
+  const todayIso = new Date().toISOString().split('T')[0];
+  const [activeIso, setActiveIso] = useState(todayIso);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/ongoing.json')
-      .then(res => res.json())
-      .then(data => setSeed(data.tasks))
-      .catch(err => console.error('Failed to load ongoing tasks:', err));
+    const loadTasks = async () => {
+      try {
+        setLoading(true);
+        const response = await taskApi.getOngoingTasks();
+        // Map API response to frontend task format
+        const tasks = response.data.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          steps: [], // Will need separate API call to get steps
+          isoDate: '2024-12-26', // TODO: Extract from task creation date
+          timeLabel: new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          defaultOpen: false,
+        }));
+        setSeed(tasks);
+      } catch (err) {
+        console.error('Failed to load ongoing tasks:', err);
+        setError('Failed to load tasks');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTasks();
   }, []);
 
   const visible = seed.filter(t => t.isoDate === activeIso);
@@ -95,7 +118,6 @@ export function OngoingTab({ onStartWork }: { onStartWork: (task: Partial<Task>,
     <>
       <h1 className="page-title"><b>Ongoing</b> <span className="title-light">{niceDay}</span></h1>
       <WeekTimeline
-        anchor={new Date(2024, 11, 22)}
         activeIso={activeIso}
         onPick={setActiveIso}
         weekOffset={weekOffset}

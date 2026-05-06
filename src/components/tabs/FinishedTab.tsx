@@ -1,6 +1,7 @@
 import './FinishedTab.css';
 import React, { useState, useEffect } from 'react';
 import { IconChev, IconCheck } from '../shared/Icons';
+import { taskApi } from '../../lib/api';
 
 interface FinishedCard {
   n: number;
@@ -50,12 +51,31 @@ function FinishedCardComponent({ n, title, finishedOn, steps, defaultOpen = fals
 
 export function FinishedTab() {
   const [cards, setCards] = useState<FinishedCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/finished.json')
-      .then(res => res.json())
-      .then(data => setCards(data.cards))
-      .catch(err => console.error('Failed to load finished tasks:', err));
+    const loadFinishedTasks = async () => {
+      try {
+        setLoading(true);
+        const response = await taskApi.getFinishedTasks();
+        // Map API response to frontend finished card format
+        const finishedCards = response.data.map((task: any, index: number) => ({
+          n: index + 1,
+          title: task.title,
+          finishedOn: new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          steps: [], // TODO: Fetch steps data separately
+          defaultOpen: false,
+        }));
+        setCards(finishedCards);
+      } catch (err) {
+        console.error('Failed to load finished tasks:', err);
+        setError('Failed to load tasks');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadFinishedTasks();
   }, []);
 
   return (
