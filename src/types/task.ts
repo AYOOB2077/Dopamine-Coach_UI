@@ -14,6 +14,9 @@ export interface Task {
   timeLabel: string;       // Maps to string TimeLabel
   dateLabel?: string;      // Optional display string
   isCompleted: boolean;    // Maps to bool IsCompleted
+  totalSteps?: number;
+  totalStepsCompleted?: number;
+  createdAt?: string;
   steps: Step[];           // Navigation property: ICollection<Step> Steps
   defaultOpen?: boolean;   // UI only state flag, could map to a UserPreference
   sessionMetadata?: SessionMetadata;  // Session metadata with priority and timing info

@@ -17,12 +17,12 @@ export function SurveyGateway({ onStart }: { onStart: () => void }) {
   );
 }
 
-export function SurveyScreen({ onDone }: { onDone: (answers: number[]) => void }) {
+export function SurveyScreen({ stepId = "", onDone }: { stepId?: string; onDone: (answers: number[]) => void }) {
   const questions = [
-    'How would you rate your stress right now?',
-    'How clear does your mind feel?',
-    'How much energy do you have left?',
-    'How satisfied are you with this step?',
+    'How would you rate your enthusiasm right now?',
+    'How would you rate your fatigue?',
+    'How would you rate your anxiety?',
+    'How would you rate your distraction?',
   ];
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
@@ -50,12 +50,6 @@ export function SurveyScreen({ onDone }: { onDone: (answers: number[]) => void }
       if (idx < questions.length - 1) {
         setIdx(idx + 1);
       } else {
-        try {
-          // Provide real taskId and stepId from context when available
-          await surveyApi.submitSurvey('taskId-placeholder', 'stepId-placeholder', next);
-        } catch (e) {
-          console.error('Failed to submit survey', e);
-        }
         onDone(next);
       }
     }, 280);

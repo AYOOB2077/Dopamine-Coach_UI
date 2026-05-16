@@ -34,6 +34,31 @@ apiClient.interceptors.response.use(
   }
 );
 
+// --- Helper Functions ---
+/**
+ * Converts a frontend Step object to a backend StepResponseDto for API calls
+ */
+export const convertStepToDto = (step: any) => {
+  return {
+    id: step.id,
+    taskId: step.taskId,
+    stepOrder: step.orderIndex || 0,
+    stepTitle: step.stepTitle || step.title || '',
+    stepDescription: step.decomposition || '',
+    deliverable: step.deliverable || '',
+    estimatedTime: step.estimatedTime || 25,
+    primaryVerb: step.primaryVerb || '',
+    noveltyHook: step.noveltyHook || '',
+    passionAnchor: step.passionAnchor || '',
+    urgencyCue: step.urgencyCue || '',
+    incupTag: step.incupTag || 0,
+    status: step.isCompleted ? 2 : (step.status || 0),
+    createdAt: step.createdAt || new Date().toISOString(),
+    startedAt: step.startedAt || new Date().toISOString(),
+    completedAt: step.completedAt || new Date().toISOString(),
+  };
+};
+
 // --- Auth Endpoints ---
 export const authApi = {
   signup: (userData: { email: string; password: string; passwordConfirm: string; fullName?: string }) =>
@@ -50,10 +75,17 @@ export const taskApi = {
   getAllTasks: () => apiClient.get('/api/tasks/get/all/tasks'),
 
   // Get tasks by status
-  getUpcomingTasks: () => apiClient.get('/api/tasks/get/all/upcoming-tasks'),
-  getOngoingTasks: () => apiClient.get('/api/tasks/get/all/ongoing-tasks'),
-  getFinishedTasks: () => apiClient.get('/api/tasks/get/all/finished-tasks'),
-  getTasksByDate: () => apiClient.get('/api/tasks/get/all/tasks-by-date'),
+  getUpcomingTasks: (userId: string, date: string) => apiClient.get('/api/Tasks/get/all/upcoming-tasks', { params: { userId, date } }),
+  getOngoingTasks: (userId: string, date: string) => apiClient.get('/api/Tasks/get/all/ongoing-tasks', { params: { userId, date } }),
+  getFinishedTasks: (userId: string) => apiClient.get('/api/Tasks/get/all/finished-tasks', { params: { userId } }),
+  
+  // Get tasks by date (ISO format: YYYY-MM-DD)
+  getTasksByDate: (date?: string) => {
+    const dateParam = date || new Date().toISOString().split('T')[0]; // Default to today
+    return apiClient.get(`/api/Tasks/get/all/tasks-by-date`, {
+      params: { date: dateParam }
+    });
+  },
 
   // Get specific task
   getTaskById: (taskId: string) => apiClient.get(`/api/tasks/get/task/${taskId}`),
@@ -65,6 +97,10 @@ export const taskApi = {
   // Create AI task with steps
   createTaskWithStepsFromAi: (userId: string, taskData: { title: string; description: string; userInput?: string }) =>
     apiClient.post(`/api/tasks/create/task/ai/with-steps/${userId}`, taskData),
+    
+  // Update task
+  updateTask: (taskId: string, taskData: { title: string; description: string; status: number; taskLevel: number }) =>
+    apiClient.put(`/api/Tasks/update/task/${taskId}`, taskData),
 
   // Update task status
   completeTask: (taskId: string) => apiClient.put(`/api/tasks/complete/task/${taskId}`),
@@ -77,7 +113,20 @@ export const stepApi = {
   getAllSteps: () => apiClient.get('/api/steps/get/all/steps'),
   getStepById: (stepId: string) => apiClient.get(`/api/steps/get/step/${stepId}`),
   getStepsByTaskId: (taskId: string) => apiClient.get(`/api/Steps/get/all/steps/${taskId}`),
-  completeStep: (stepId: string) => apiClient.put(`/api/steps/complete/step/${stepId}`),
+  startStep: (step: any) => {
+    const dto = convertStepToDto(step);
+    return apiClient.post(`/api/Steps/start/step/${step.id}`, dto);
+  },
+  completeStep: (step: any) => {
+    const userId = localStorage.getItem('user_id') || 'placeholder-user-id';
+    const dto = {
+      userId: userId,
+      taskId: step.taskId,
+      stepId: step.id,
+      statusStep: 2
+    };
+    return apiClient.put(`/api/Steps/complete/step/${userId}`, dto);
+  },
   deleteStep: (stepId: string) => apiClient.delete(`/api/steps/delete/step/${stepId}`),
 };
 

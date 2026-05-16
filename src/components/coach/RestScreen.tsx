@@ -2,64 +2,93 @@ import './RestScreen.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { surveyApi } from '../../lib/api';
 
-export interface RestTip {
-  /** Short wellness tip shown as the headline */
-  tip: string;
-  /** Source / attribution shown below the tip (optional) */
-  source?: string;
-  /** Rest duration in seconds — comes from the back office */
-  durationSeconds: number;
-}
-
-// ---------------------------------------------------------------------------
-// GET /api/rest-tips/current (Using surveyApi.getCurrentTip falling back to mock)
-// ---------------------------------------------------------------------------
-const FALLBACK_TIPS: RestTip[] = [
-  { tip: 'Close your eyes and take three slow, deep breaths.', source: 'Breathing technique', durationSeconds: 60 },
-  { tip: 'Stand up, stretch your arms above your head, and roll your shoulders.', source: 'Movement break', durationSeconds: 90 },
-  { tip: 'Look at something at least 6 metres away for 20 seconds to relax your eyes.', source: '20-20-20 rule', durationSeconds: 60 },
-  { tip: 'Drink a glass of water and let your mind go blank for a moment.', source: 'Hydration tip', durationSeconds: 60 },
-  { tip: 'Tense every muscle in your body for 5 seconds, then fully release.', source: 'Progressive relaxation', durationSeconds: 90 },
-];
-
-async function fetchOrPickTip(): Promise<RestTip> {
-  try {
-    const res = await surveyApi.getCurrentTip();
-    if (res.data) return res.data;
-  } catch (e) {
-    console.warn('Backend /api/rest-tips/current not available, using fallback tip.');
-  }
-  return FALLBACK_TIPS[Math.floor(Math.random() * FALLBACK_TIPS.length)];
+export interface RestAdvice {
+  Diagnosis: string;
+  HowToConsumeTasks: string;
+  ExternalBehavior: string;
 }
 
 // Countdown ring constants
 const RADIUS = 42;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-export function RestScreen({ onDone }: { onDone: () => void }) {
-  const [restTip, setRestTip] = useState<RestTip | null>(null);
+interface RestScreenProps {
+  stepId?: string;
+  answers?: number[];
+  estimatedTime?: number;
+  onDone: () => void;
+}
+
+export function RestScreen({ stepId = "", answers = [], estimatedTime = 10, onDone }: RestScreenProps) {
+  const [advice, setAdvice] = useState<RestAdvice | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const [totalRestTime, setTotalRestTime] = useState<number | null>(null);
+  const [isGenerating, setIsGenerating] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    fetchOrPickTip().then(tip => {
-      setRestTip(tip);
-      setSecondsLeft(tip.durationSeconds);
-    });
-  }, []);
+    // 25% of estimated time (converted to seconds)
+    const totalSecs = Math.floor(estimatedTime * 60 * 0.25);
+    const finalSecs = totalSecs > 15 ? totalSecs : 15; // At least 15 seconds
+    
+    setTotalRestTime(finalSecs);
+    setSecondsLeft(finalSecs);
+
+    const fetchAdvice = async () => {
+      try {
+        const response = await fetch('http://localhost:5293/api/StepFeels', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            stepId: stepId,
+            scoreEnthusiasm: answers[0] ?? 3,
+            scoreFatigue: answers[1] ?? 3,
+            scoreAnxiety: answers[2] ?? 3,
+            scoreDistraction: answers[3] ?? 3
+          })
+        });
+        const data = await response.json();
+        
+        // Extract the first advice from the strategicAdvices array, if it exists
+        const adviceList = data.strategicAdvices || data.StrategicAdvices || [];
+        const firstAdvice = adviceList.length > 0 ? adviceList[0] : null;
+
+        if (firstAdvice) {
+          setAdvice({
+            Diagnosis: firstAdvice.diagnosis || firstAdvice.Diagnosis,
+            HowToConsumeTasks: firstAdvice.howToConsumeTasks || firstAdvice.HowToConsumeTasks,
+            ExternalBehavior: firstAdvice.externalBehavior || firstAdvice.ExternalBehavior,
+          });
+        } else {
+          // Fallback if the top-level object directly has them (just in case)
+          setAdvice({
+            Diagnosis: data.diagnosis || data.Diagnosis || 'No diagnosis available.',
+            HowToConsumeTasks: data.howToConsumeTasks || data.HowToConsumeTasks || 'No strategy available.',
+            ExternalBehavior: data.externalBehavior || data.ExternalBehavior || 'No baseline adjustment available.',
+          });
+        }
+      } catch (e) {
+        console.error('Failed to submit survey / fetch advice', e);
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+
+    fetchAdvice();
+  }, [stepId, answers, estimatedTime]);
 
   useEffect(() => {
-    if (secondsLeft === null || !restTip) return;
+    if (totalRestTime === null) return;
 
-    intervalRef.current = setInterval(async () => {
+    intervalRef.current = setInterval(() => {
       setSecondsLeft((s) => {
         if (s !== null && s <= 1) {
           clearInterval(intervalRef.current!);
-          
-          surveyApi.completeRest('placeholder-session-id').catch(e => 
+          surveyApi.completeRest('placeholder-session-id').catch((e: any) => 
             console.error('Failed to report rest completion', e)
           );
-          
           onDone();
           return 0;
         }
@@ -67,22 +96,35 @@ export function RestScreen({ onDone }: { onDone: () => void }) {
       });
     }, 1000);
     return () => clearInterval(intervalRef.current!);
-  }, [onDone, secondsLeft, restTip]);
+  }, [totalRestTime, onDone]);
 
-  if (!restTip || secondsLeft === null) return <div className="focus-stage" />;
+  if (totalRestTime === null || secondsLeft === null) return <div className="focus-stage" />;
 
-  const progress = secondsLeft / restTip.durationSeconds; // 1 → 0
+  const progress = secondsLeft / totalRestTime; // 1 → 0
   const dashOffset = CIRCUMFERENCE * (1 - progress);
+  const percentElapsed = 1 - progress;
 
   const mins = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
-  const timeLabel = mins > 0
-    ? `${mins}:${String(secs).padStart(2, '0')}`
-    : `${secs}`;
+  
+  let timerColor = 'turquoise';
+  let showNumbers = false;
+
+  if (percentElapsed >= 0.5 && percentElapsed < 0.75) {
+    timerColor = 'yellow';
+    showNumbers = true;
+  } else if (percentElapsed >= 0.75) {
+    timerColor = '#ff4d4d'; // Soft red
+    showNumbers = true;
+  }
+
+  const timeLabel = showNumbers 
+    ? (mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}`) 
+    : '';
 
   return (
     <div className="rest-stage">
-      <div className="rest-card">
+      <div className="rest-card" style={{ maxWidth: '600px', width: '100%' }}>
         {/* Pulsing leaf icon */}
         <div className="rest-icon" aria-hidden="true">
           <svg viewBox="0 0 32 32" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -92,7 +134,7 @@ export function RestScreen({ onDone }: { onDone: () => void }) {
         </div>
 
         {/* Countdown ring */}
-        <div className="rest-timer-wrap" aria-label={`${timeLabel} remaining`}>
+        <div className="rest-timer-wrap" aria-label={`${timeLabel} remaining`} style={{ marginBottom: '2rem' }}>
           <svg className="rest-timer-svg" viewBox="0 0 100 100">
             <circle className="rest-timer-track" cx="50" cy="50" r={RADIUS} />
             <circle
@@ -102,17 +144,38 @@ export function RestScreen({ onDone }: { onDone: () => void }) {
               r={RADIUS}
               strokeDasharray={CIRCUMFERENCE}
               strokeDashoffset={dashOffset}
+              style={{ stroke: timerColor, transition: 'stroke 0.5s ease-in-out' }}
             />
           </svg>
-          <div className="rest-timer-label">{timeLabel}</div>
+          <div className="rest-timer-label" style={{ color: timerColor }}>{timeLabel}</div>
         </div>
 
-        {/* Tip */}
-        <div className="rest-label">Rest tip</div>
-        <p className="rest-tip">{restTip.tip}</p>
-        {restTip.source && (
-          <p className="rest-source">{restTip.source}</p>
-        )}
+        {/* Advice Area */}
+        <div style={{ textAlign: 'left', minHeight: '200px' }}>
+          {isGenerating ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.8 }}>
+              <div className="login-spinner" style={{ marginBottom: '1rem', width: '30px', height: '30px' }} />
+              <p>Analyzing your metrics and generating advice...</p>
+            </div>
+          ) : advice ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <strong style={{ opacity: 0.6, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Diagnosis</strong>
+                <p style={{ marginTop: '0.2rem', fontSize: '1rem', lineHeight: '1.4' }}>{advice.Diagnosis}</p>
+              </div>
+              <div>
+                <strong style={{ opacity: 0.6, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next Steps Strategy</strong>
+                <p style={{ marginTop: '0.2rem', fontSize: '1rem', lineHeight: '1.4' }}>{advice.HowToConsumeTasks}</p>
+              </div>
+              <div>
+                <strong style={{ opacity: 0.6, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Adjusting Baseline</strong>
+                <p style={{ marginTop: '0.2rem', fontSize: '1rem', lineHeight: '1.4' }}>{advice.ExternalBehavior}</p>
+              </div>
+            </div>
+          ) : (
+            <p>Could not load advice for this session.</p>
+          )}
+        </div>
 
         {/* Skip */}
         <button
@@ -122,6 +185,7 @@ export function RestScreen({ onDone }: { onDone: () => void }) {
             onDone();
           }}
           aria-label="Skip rest and continue"
+          style={{ marginTop: '2rem' }}
         >
           Skip rest →
         </button>

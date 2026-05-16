@@ -1,7 +1,9 @@
 import './RoadmapScreen.css';
 import React from 'react';
 import { Task, Step } from '../../types/models';
-import { Button } from '../ui/button';import { focusSessionApi } from '../../lib/api';
+import { Button } from '../ui/button';
+import { focusSessionApi, stepApi } from '../../lib/api';
+
 export function RoadmapScreen({ task, onStart }: { task: Partial<Task>; onStart: (steps: Partial<Step>[]) => void }) {
   const steps = task.steps || [
     { 
@@ -86,10 +88,15 @@ export function RoadmapScreen({ task, onStart }: { task: Partial<Task>; onStart:
         <Button className="btn-lg" onClick={async () => {
           try {
             if (steps.length > 0 && task.id) {
+              // Start the first step
+              if (steps[0].id) {
+                await stepApi.startStep(steps[0]);
+              }
+              // Initialize focus session
               await focusSessionApi.startSession(task.id, steps[0].id || 'temp-id');
             }
           } catch (e) {
-            console.error('Failed to initialize focus session', e);
+            console.error('Failed to start step or initialize focus session', e);
           }
           onStart(steps);
         }}>Start work</Button>

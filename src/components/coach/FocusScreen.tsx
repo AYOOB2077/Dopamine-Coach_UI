@@ -133,7 +133,7 @@ export function FocusScreen({
         <button className="focus-sq focus-sq-complete" onClick={async () => {
           try {
             if (step && step.id) {
-              await stepApi.completeStep(step.id);
+              await stepApi.completeStep(step);
             }
           } catch (e) {
             console.error('Failed to mark step complete', e);

@@ -85,31 +85,64 @@ export function OngoingTab({ onStartWork }: { onStartWork: (task: Partial<Task>,
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Load tasks when date changes
   useEffect(() => {
-    const loadTasks = async () => {
+    const loadTasksByDate = async () => {
       try {
+        const userId = localStorage.getItem('user_id');
+        if (!userId) {
+          setError('User not logged in');
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
-        const response = await taskApi.getOngoingTasks();
+        const response = await taskApi.getOngoingTasks(userId, activeIso);
+        
         // Map API response to frontend task format
         const tasks = response.data.map((task: any) => ({
           id: task.id,
           title: task.title,
           description: task.description,
-          steps: [], // Will need separate API call to get steps
-          isoDate: '2024-12-26', // TODO: Extract from task creation date
+          totalSteps: task.totalSteps,
+          totalStepsCompleted: task.totalStepsCompleted,
+          createdAt: task.createdAt,
+          steps: (task.steps || []).map((step: any) => ({
+            id: step.id,
+            taskId: step.taskId,
+            title: step.stepTitle || step.title,
+            stepTitle: step.stepTitle,
+            description: step.stepDescription,
+            deliverable: step.deliverable,
+            estimatedTime: step.estimatedTime,
+            primaryVerb: step.primaryVarb,
+            noveltyHook: step.noveltyHook,
+            passionAnchor: step.passionAnchor,
+            urgencyCue: step.urgencyCue,
+            status: step.status,
+            createdAt: step.createdAt,
+            startedAt: step.startedAt,
+            completedAt: step.completedAt,
+            isCompleted: step.status === 2, // Assuming 2 means completed
+            orderIndex: step.stepOrder,
+            incupTags: step.incupTag ? [step.incupTag] : []
+          })) || [],
+          isoDate: activeIso, // Use the selected date
           timeLabel: new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           defaultOpen: false,
         }));
         setSeed(tasks);
       } catch (err) {
-        console.error('Failed to load ongoing tasks:', err);
+        console.error('Failed to load tasks for date:', err);
         setError('Failed to load tasks');
+        setSeed([]);
       } finally {
         setLoading(false);
       }
     };
-    loadTasks();
-  }, []);
+    
+    loadTasksByDate();
+  }, [activeIso]); // Re-run when activeIso changes
 
   const visible = seed.filter(t => t.isoDate === activeIso);
   const niceDay = new Date(activeIso + 'T00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' });

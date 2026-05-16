@@ -1,5 +1,4 @@
 import { useState, FormEvent } from 'react';
-import { authApi } from '../../lib/api';
 import './LoginScreen.css'; // Reuse auth layout styles
 
 type SetupScreenProps = {

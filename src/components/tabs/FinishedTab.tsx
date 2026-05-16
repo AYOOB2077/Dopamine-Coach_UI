@@ -58,13 +58,18 @@ export function FinishedTab() {
     const loadFinishedTasks = async () => {
       try {
         setLoading(true);
-        const response = await taskApi.getFinishedTasks();
+        const userId = localStorage.getItem('user_id') || 'placeholder-user-id';
+        const response = await taskApi.getFinishedTasks(userId);
+        
         // Map API response to frontend finished card format
         const finishedCards = response.data.map((task: any, index: number) => ({
           n: index + 1,
           title: task.title,
           finishedOn: new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          steps: [], // TODO: Fetch steps data separately
+          steps: (task.steps || []).map((step: any) => ({
+            title: step.stepTitle,
+            ts: new Date(step.completedAt || step.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          })),
           defaultOpen: false,
         }));
         setCards(finishedCards);

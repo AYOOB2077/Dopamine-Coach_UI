@@ -16,7 +16,6 @@ import { UpcomingTab } from './components/tabs/UpcomingTab';
 import { FinishedTab } from './components/tabs/FinishedTab';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { SignupScreen } from './components/auth/SignupScreen';
-import { SetupScreen } from './components/auth/SetupScreen';
 import { SettingsScreen } from './components/user/SettingsScreen';
 import { Task, Step, BackendRoadmapResponse } from './types/models';
 
@@ -161,7 +160,7 @@ export default function App() {
   };
 
   // --- Auth Pages Routing ---
-  if (!isAuthenticated && ['/login', '/signup', '/setup'].includes(location.pathname)) {
+  if (!isAuthenticated && ['/login', '/signup'].includes(location.pathname)) {
     return (
       <Routes>
         <Route path="/login" element={
@@ -172,25 +171,29 @@ export default function App() {
               navigate('/coach'); 
             }}
             onSignUp={() => navigate('/signup')}
-            onGoogleSignIn={() => navigate('/setup')}
+            onGoogleSignIn={() => {
+              setIsAuthenticated(true);
+              localStorage.setItem('auth_token', 'logged_in');
+              navigate('/coach');
+            }}
           />
         } />
         <Route path="/signup" element={
           <SignupScreen 
-            onSignUpSuccess={() => navigate('/setup')} 
+            onSignUpSuccess={() => {
+              setIsAuthenticated(true);
+              localStorage.setItem('auth_token', 'logged_in');
+              navigate('/coach');
+            }} 
             onLoginClick={() => navigate('/login')} 
-            onGoogleSignIn={() => navigate('/setup')}
-          />
-        } />
-        <Route path="/setup" element={
-          <SetupScreen 
-            onSetupComplete={() => { 
-              setIsAuthenticated(true); 
-              localStorage.setItem('auth_token', 'setup_complete');
-              navigate('/coach'); 
+            onGoogleSignIn={() => {
+              setIsAuthenticated(true);
+              localStorage.setItem('auth_token', 'logged_in');
+              navigate('/coach');
             }}
           />
         } />
+        
       </Routes>
     );
   }
@@ -228,8 +231,8 @@ export default function App() {
           ) : <Navigate to="/coach" replace />
         } />
         <Route path="/coach/gateway" element={<SurveyGateway onStart={startSurvey} />} />
-        <Route path="/coach/survey" element={<SurveyScreen onDone={surveyDone} />} />
-        <Route path="/coach/rest" element={<RestScreen onDone={restDone} />} />
+        <Route path="/coach/survey" element={<SurveyScreen stepId={steps[stepIdx]?.id?.toString() || ""} onDone={surveyDone} />} />
+        <Route path="/coach/rest" element={<RestScreen stepId={steps[stepIdx]?.id?.toString() || ""} answers={answers} estimatedTime={steps[stepIdx]?.estimatedTime || 10} onDone={restDone} />} />
         <Route path="/coach/recovery" element={
           steps.length > 0 ? (
             <RecoveryScreen

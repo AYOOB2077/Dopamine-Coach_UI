@@ -130,22 +130,7 @@ export function TaskPopup({
         </div>
         <div className="up-modal-foot">
           <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-          <Button onClick={async () => {
-            try {
-              if (mode === 'create') {
-                const userId = localStorage.getItem('user_id');
-                if (!userId) {
-                  console.error('No user_id found in localStorage');
-                  return;
-                }
-                await taskApi.createTask(userId, { title: title.trim(), description: desc.trim() });
-              } else {
-                // If it's an edit, you'd call a PUT task endpoint if available.
-                // await taskApi.updateTask(task.id, { title: title.trim(), description: desc.trim() });
-              }
-            } catch (e) {
-              console.error('Failed to save task in popup', e);
-            }
+          <Button onClick={() => {
             onSave({ title: title.trim(), description: desc.trim() });
           }}>
             {mode === 'edit' ? 'Save changes' : 'Add task'}
